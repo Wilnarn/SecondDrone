@@ -3,9 +3,16 @@ import requests
 import argparse
 from sense_hat import SenseHat
 import pygame
+import redis
+import pickle
+import time
+import threading
+import json
 sense = SenseHat()
 pygame.mixer.init()
 sense.clear()
+
+redis_server = redis.Redis(host="192.168.3.4", port="7777", decode_responses=True, charset="unicode_escape")
 
 def translate(coords_osm):
     x_osm_lim = (13.143390664, 13.257501336)
@@ -70,6 +77,7 @@ def yellowMatrix():
         br, br, br, br, br, br, br, br,
         br, br, br, br, br, br, br, br,
         br, s, s, s, s, s, s, br,
+        
         s, s, s, s, s, s, s, s,
         s, w, bl, s, s, bl, w, s,
         s, s, s, br, br, s, s, s,
@@ -78,7 +86,17 @@ def yellowMatrix():
     ]
     
     sense.set_pixels(steve_pixels)
-    
+
+def check_job_queue(current_coords):
+    while True:
+        if redis_server.hget("Drone_1", 'status') == "idle" and redis_server.llen('drone_job_queue') > 0:
+            serialized_job = redis_server.rpop('drone_job_queue')
+            if serialized_job is not None:
+                job_data = json.loads(serialized_job)
+                newFrom = job_data['from']
+                newTo = job_data['to']
+                current_coords = run('Drone_1', current_coords, newFrom, newTo, SERVER_URL)
+        time.sleep(1)
     
     
 def waitForConf():
@@ -103,6 +121,27 @@ def getMovement(src, dst):
     longitude_move = speed * ((dst_x - x) / direction )
     latitude_move = speed * ((dst_y - y) / direction )
     return longitude_move, latitude_move
+    
+def getDirection(src, dst):
+    dst_x, dst_y = dst
+    x, y = src
+    direction = math.sqrt((dst_x - x)**2 + (dst_y - y)**2)
+    return direction
+    
+def getChargerStation(src):
+    c1 = (13.19974, 55.70382)
+    c2 = (13.20727, 55.72358)
+    c3 = (13.19953, 55.69552)
+    d1 = getDirection(src, c1)
+    d2 = getDirection(src, c2)
+    d3 = getDirection(src, c3)
+    closest = min(d1, d2, d3)
+    if (closest == d1):
+        return c1
+    elif (closest == d2):
+        return c2
+    else:
+        return c3
 
 def moveDrone(src, d_long, d_la):
     x, y = src
@@ -111,6 +150,7 @@ def moveDrone(src, d_long, d_la):
     return (x, y)
     
 def run(id, current_coords, from_coords, to_coords, SERVER_URL):
+    waitForConf()
     drone_coords = current_coords
     d_long, d_la =  getMovement(drone_coords, from_coords)
     #flyger till upphämtning
@@ -137,8 +177,15 @@ def run(id, current_coords, from_coords, to_coords, SERVER_URL):
                           'status': 'busy'
                         }
             resp = session.post(SERVER_URL, json=drone_info)
-    d_long, d_la =  getMovement(drone_coords, charge_coords)
     waitForConf()
+    
+   # while redis_server.llen('drone_job_queue') > 0:
+    #    serialized_job = redis_server.rpop('drone_job_queue')
+     #   job_data = json.loads(serialized_job)
+      #  newFrom = job_data['from']
+       # newTo = job_data['to']
+        #drone_coords = run(id, drone_coords, newFrom, newTo, SERVER_URL)
+    d_long, d_la =  getMovement(drone_coords, charge_coords)
     #flyger till laddstation (charge_coords här)
     while ((charge_coords[0] - drone_coords[0])**2 + (charge_coords[1] - drone_coords[1])**2)*10**6 > 0.0002:
         redMatrix()
@@ -151,6 +198,7 @@ def run(id, current_coords, from_coords, to_coords, SERVER_URL):
                         }
             resp = session.post(SERVER_URL, json=drone_info)
     greenMatrix()
+    waitForConf()
     with requests.Session() as session:
             drone_info = {'id': id,
                           'longitude': drone_coords[0],
@@ -158,9 +206,15 @@ def run(id, current_coords, from_coords, to_coords, SERVER_URL):
                           'status': 'idle'
                          }
             resp = session.post(SERVER_URL, json=drone_info)
-    return drone_coords[0], drone_coords[1]
+    waitForConf()
+    check_job_queue(charge_coords)
+    #return drone_coords[0], drone_coords[1]
+    greenMatrix()
+    return drone_coords
    
 if __name__ == "__main__":
+    
+    threading.Thread(target=check_job_queue, daemon=True).start()
     # Fill in the IP address of server, in order to location of the drone to the SERVER
     #===================================================================
     SERVER_URL = "http://192.168.3.4:5001/drone"
@@ -173,15 +227,13 @@ if __name__ == "__main__":
     parser.add_argument("--flat", help='latitude of input [from address]' ,type=float)
     parser.add_argument("--tlong", help ='longitude of input [to address]' ,type=float)
     parser.add_argument("--tlat", help ='latitude of input [to address]' ,type=float)
-    parser.add_argument("--chlong", help ='longitude of input [charge address]' ,type=float)
-    parser.add_argument("--chlat", help ='latitude of input [charge address]' ,type=float)
     parser.add_argument("--id", help ='drones ID' ,type=str)
     args = parser.parse_args()
 
     current_coords = (args.clong, args.clat)
     from_coords = (args.flong, args.flat)
     to_coords = (args.tlong, args.tlat)
-    charge_coords = (556.8750666520444, 441.6129139777284)
+    charge_coords = getChargerStation(to_coords)
 
     print(current_coords, from_coords, to_coords)
     drone_long, drone_lat = run(args.id ,current_coords, from_coords, to_coords, SERVER_URL)
@@ -189,4 +241,3 @@ if __name__ == "__main__":
     file.write(str(drone_long) + "\n" + str(drone_lat))
     # drone_long and drone_lat is the final location when drlivery is completed, find a way save the value, and use it for the initial coordinates of next delivery
     #=============================================================================
-

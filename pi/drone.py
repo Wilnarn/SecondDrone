@@ -39,6 +39,9 @@ with requests.Session() as session:
 @app.route('/', methods=['POST'])
 def main():
     coords = request.json
+    
+    if 'from' not in coords or 'to' not in coords:
+        return 'Invalid request data', 400
     # Get current longitude and latitude of the drone 
     #===================================================================
     file = open('dcoords.txt', 'r')

@@ -11,6 +11,10 @@ Go to `/webserver`, start your Redis server and run the two flask servers:
 ```
 export FLASK_APP=database.py
 export FLASK_ENV=development
+
+
+
+
 flask run --port=5001 --host 0.0.0.0
 ```
 3. On Terminal 3, run `build.py`
