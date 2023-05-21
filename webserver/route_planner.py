@@ -49,7 +49,7 @@ def route_planner():
         message = 'No available drone, try later'
         # else:
             # 2. Get the IP of available drone, 
-        DRONE_URL = 'http://' + DRONE_IP+':5000'
+        DRONE_URL = 'http://localhost:3000/track/alfatest/drone'
             # 3. Send coords to the URL of available drone
         message = 'Got address and sent request to the drone'
     return message

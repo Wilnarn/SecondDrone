@@ -36,9 +36,24 @@ def translate(coords_osm):
 
     return x_svg, y_svg
 
-@app.route('/', methods=['GET'])
+@app.route('/track/alfatest', methods=['GET'])
 def map():
-    return render_template('index.html')
+    # Retrieve the drone's location
+    drone_location = get_drone_location()
+
+    # Pass the drone_location to the template for rendering
+    return render_template('index.html', drone_location=drone_location)
+
+
+def get_drone_location():
+    # Your logic for retrieving the drone's location
+    # This can include calling the Python code and parsing the result
+    longitude = 13.203161
+    latitude = 55.705195
+    status = 'idle'
+
+    return {'longitude': longitude, 'latitude': latitude, 'status': status}
+
 
 @app.route('/get_drones', methods=['GET'])
 def get_drones():

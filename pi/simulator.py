@@ -163,7 +163,7 @@ def run(id, current_coords, from_coords, to_coords, SERVER_URL):
 if __name__ == "__main__":
     # Fill in the IP address of server, in order to location of the drone to the SERVER
     #===================================================================
-    SERVER_URL = "http://192.168.3.4:5001/drone"
+    SERVER_URL = "http://localhost:5000/track/alfatest"
     #===================================================================
 
     parser = argparse.ArgumentParser()

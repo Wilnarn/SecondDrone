@@ -31,12 +31,12 @@ drone_info = {'id': myID,
 
 # Fill in the IP address of server, and send the initial location of the drone to the SERVER
 #===================================================================
-SERVER="http://192.168.3.4:5001/drone"
+SERVER = "http://localhost:3000/track/alfatest"
 with requests.Session() as session:
     resp = session.post(SERVER, json=drone_info)
 #===================================================================
 
-@app.route('/', methods=['POST'])
+@app.route('/track/alfatest', methods=['POST'])
 def main():
     coords = request.json
     # Get current longitude and latitude of the drone 
@@ -56,4 +56,4 @@ def main():
     return 'New route received'
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='localhost', port=3000)
